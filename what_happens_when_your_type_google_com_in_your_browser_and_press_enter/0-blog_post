@@ -1,0 +1,73 @@
+What Happens When You Type https://www.google.com and Press Enter?
+
+This classic interview question tests your understanding of how the entire web stack works together. Let's walk through every layer.
+
+1. DNS Request
+
+Your browser first needs to resolve "www.google.com" into an IP address. It checks several caches in order:
+- Browser cache: did you visit recently?
+- OS cache: checked via /etc/hosts and the local resolver
+- Recursive DNS resolver (usually your ISP or a public resolver like 8.8.8.8)
+- Root nameservers -> .com TLD nameservers -> Google's authoritative nameservers
+
+Google's authoritative nameserver returns an A record like 142.250.80.46. Now your browser has a destination IP.
+
+2. TCP/IP
+
+With an IP address in hand, your OS establishes a TCP connection via the three-way handshake:
+- SYN: client sends a synchronize packet
+- SYN-ACK: server acknowledges and responds
+- ACK: client confirms
+
+The connection targets port 443 (HTTPS). IP handles routing packets across networks; TCP ensures reliable, ordered delivery.
+
+3. Firewall
+
+Along the path — on your machine, your router, and at Google's edge — firewalls inspect packets. They apply rules (allow/deny) based on IP, port, and protocol. Your OS firewall may block outbound ports; Google's firewall filters inbound traffic, allowing only legitimate requests on known ports (80, 443) while blocking malicious traffic.
+
+4. HTTPS / SSL (TLS Handshake)
+
+Before any HTTP data flows, a TLS handshake occurs:
+1. Client sends ClientHello with supported cipher suites and TLS version
+2. Server responds with its SSL certificate (issued by a Certificate Authority like DigiCert)
+3. Client verifies the certificate chain against trusted root CAs in the OS/browser
+4. Keys are exchanged (via ECDHE), establishing a symmetric session key
+5. All subsequent communication is encrypted
+
+This is what turns HTTP into HTTPS — the S stands for Secure.
+
+5. Load Balancer
+
+Your encrypted request arrives at Google's infrastructure and hits a load balancer first. Google uses sophisticated load balancing (including Maglev, their custom LB software) to:
+- Distribute requests across thousands of servers
+- Route to the geographically closest data center
+- Ensure no single server is overwhelmed
+- Provide failover if a backend is unhealthy
+
+The load balancer may terminate TLS and forward plain HTTP internally, or pass TLS through.
+
+6. Web Server
+
+The load balancer forwards the request to a web server (Google uses its own custom servers, though nginx/Apache are common elsewhere). The web server:
+- Handles the HTTP protocol
+- Serves static assets (HTML, CSS, JS, images) directly from cache/disk
+- Passes dynamic requests upstream to the application server
+
+For www.google.com, the web server quickly serves the Google Search page skeleton.
+
+7. Application Server
+
+For dynamic content — your search results — the request reaches an application server. This is where business logic runs: query parsing, personalization, ranking signals, ad selection, etc. Google's application servers run highly optimized C++ and Python services that orchestrate dozens of microservices in milliseconds.
+
+8. Database
+
+To generate results, the application server queries databases and indexes. Google's web index is stored in a massively distributed system (Bigtable, Spanner) spread across data centers worldwide. The query hits an inverted index to find relevant documents, applies PageRank and hundreds of other signals, and returns the top results — all in under 200ms.
+
+Putting It All Together
+
+Browser -> DNS -> TCP Handshake -> Firewall -> TLS Handshake
+       -> Load Balancer -> Web Server -> App Server -> Database
+                                                 |
+                               Response flows back through the chain
+
+Every time you press Enter, this entire pipeline executes — usually in under half a second. Understanding each layer is what separates a true full-stack engineer from someone who only works at one level of the stack.
